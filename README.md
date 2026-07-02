@@ -1,73 +1,44 @@
-# React + TypeScript + Vite
+Build a unique mobile-first Thimbles game called ShellRush using React, TypeScript, Vite, and Canvas animation.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Theme:
+Dark futuristic casino UI with neon cyan, purple, pink, and gold accents. The design should feel similar to a premium live casino game.
 
-Currently, two official plugins are available:
+Game mechanics:
+- Player selects bet amount.
+- Player selects difficulty: Easy 3 shells, Medium 4 shells, Hard 5 shells, Extreme 6 shells.
+- A glowing gem/ball is shown under one shell.
+- Shells cover the gem.
+- Shells shuffle smoothly with animated paths.
+- After shuffle, player picks one shell.
+- Reveal animation shows win or loss.
+- Calculate payout based on difficulty.
+- Update balance, total bets, total wins, win rate, biggest win, and recent results.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Unique features:
+- Fake Glow Shell effect during shuffle.
+- Teleport swap animation between two shells.
+- Neon trail behind moving shells.
+- Camera shake on reveal.
+- Energy pulse when player wins.
+- How To Play bottom sheet.
+- Sound toggle button.
+- Mobile-first layout.
 
-## React Compiler
+UI sections:
+- Header with logo ShellRush LIVE, balance, sound icon, profile initials.
+- Game arena with shells and glowing platform.
+- Bet controls.
+- Difficulty selector.
+- Start Game button.
+- Statistics cards.
+- Trend chart.
+- Live table.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+Technical requirements:
+- Use clean component structure.
+- Use React hooks.
+- Use CSS animations where possible.
+- Use Canvas for shell movement if needed.
+- Make it responsive for mobile and desktop.
+- Add mock player names in live table.
+- No backend required for now.

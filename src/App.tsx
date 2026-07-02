@@ -1,12 +1,8 @@
-import './App.css'
+import './App.css';
+import { ShellRush } from './shellrush/ShellRush';
 
 function App() {
-
-  return (
-    <>
-
-    </>
-  )
+    return <ShellRush />;
 }
 
-export default App
+export default App;
