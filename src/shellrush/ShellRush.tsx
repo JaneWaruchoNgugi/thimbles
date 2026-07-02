@@ -105,14 +105,16 @@ export function ShellRush() {
                 </aside>
 
                 <div className="sr-arena">
-                    <LiveArena3D
-                        phase={game.phase}
-                        shellCount={game.shellCount}
-                        gemShellId={game.gemShellId}
-                        pickedSlot={game.pickedSlot}
-                        seed={arenaSeed}
-                        onPick={game.pickSlot}
-                    />
+                    {!liveOpen && (
+                        <LiveArena3D
+                            phase={game.phase}
+                            shellCount={game.shellCount}
+                            gemShellId={game.gemShellId}
+                            pickedSlot={game.pickedSlot}
+                            seed={arenaSeed}
+                            onPick={game.pickSlot}
+                        />
+                    )}
 
                     {/* recent results — live strip, top-left inside the arena */}
                     <div className="sr-recent-strip">

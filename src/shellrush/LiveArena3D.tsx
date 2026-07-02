@@ -94,8 +94,8 @@ export function LiveArena3D(props: Props) {
 
         // ---- moving light rays (casino searchlights sweeping the backdrop) ----
         const rayGroup = new THREE.Group();
-        rayGroup.position.set(0, 0.2, -8.5);
-        rayGroup.rotation.x = -0.42;
+        rayGroup.position.set(0, 11, -2.5); // high up behind the table = ceiling spotlights
+        rayGroup.rotation.x = 0.16;
         scene.add(rayGroup);
         const rayColors = [0x62ff6e, 0x18e0a8, 0xa2f23c, 0x39e08a, 0x2fd18a];
         const rays: THREE.Object3D[] = [];
@@ -103,12 +103,12 @@ export function LiveArena3D(props: Props) {
         for (let i = 0; i < NRAY; i++) {
             const mat = new THREE.MeshBasicMaterial({
                 color: rayColors[i % rayColors.length],
-                transparent: true, opacity: 0.085, blending: THREE.AdditiveBlending,
-                depthWrite: false, side: THREE.DoubleSide,
+                transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending,
+                depthWrite: false, side: THREE.DoubleSide, fog: false,
             });
-            const beam = new THREE.Mesh(new THREE.ConeGeometry(1.05, 26, 22, 1, true), mat);
-            beam.rotation.x = Math.PI;   // narrow tip at the source, widening upward
-            beam.position.y = 13;
+            // narrow tip at the top (the light), widening downward toward the table
+            const beam = new THREE.Mesh(new THREE.ConeGeometry(1.5, 30, 24, 1, true), mat);
+            beam.position.y = -15;
             const pivot = new THREE.Object3D();
             pivot.add(beam);
             pivot.rotation.z = (i / (NRAY - 1) - 0.5) * 0.95;
