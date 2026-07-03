@@ -17,7 +17,6 @@ export const CHIP_COLORS: Record<number, string> = {
     100: '#c0392b',
     200: '#8e44ad',
 };
-export const CHIP_OTHER = '#6b7488';
 
 export const MIN_BET = 10;
 

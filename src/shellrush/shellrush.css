@@ -17,6 +17,7 @@
 
     position: relative;
     min-height: 100vh;
+    min-height: 100dvh;
     margin: 0 auto;
     max-width: 1120px;
     padding: 14px 12px 40px;
@@ -31,6 +32,21 @@
         radial-gradient(700px 500px at 0% 40%, rgba(63, 224, 95, 0.06), transparent 60%),
         var(--bg);
 }
+
+/* soft breathing glow that fills the empty stage space on wide screens */
+.sr-ambient {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(60% 55% at 50% 120%, rgba(63, 224, 95, 0.1), transparent 60%),
+        radial-gradient(40% 40% at 8% 0%, rgba(18, 179, 106, 0.08), transparent 60%),
+        radial-gradient(40% 40% at 92% 0%, rgba(79, 209, 30, 0.07), transparent 60%);
+}
+/* lift the layout sections above the ambient glow — scoped so it never touches
+   the fixed-position overlays (bottom sheet / live game) */
+.sr-header, .sr-stage, .sr-dock, .sr-footer { position: relative; z-index: 1; }
 
 /* subtle film grain over everything */
 .sr-grain {
@@ -49,19 +65,33 @@
     color: var(--muted);
 }
 
+/* solo mini game is rendered as a full overlay above the live landing page */
+.sr-overlay { position: fixed; inset: 0; z-index: 300; overflow-y: auto; animation: lg-in 0.28s ease; }
+
 /* ---------- HEADER ---------- */
 .sr-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: nowrap;
     gap: 12px;
+    min-height: 60px;
     padding: 10px 14px;
     border: 1px solid var(--line);
     border-radius: 16px;
     background: linear-gradient(180deg, rgba(20, 24, 46, 0.8), rgba(10, 12, 26, 0.8));
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
-.sr-brand { display: flex; align-items: center; gap: 10px; }
+/* back-to-live button at the far left of the solo header */
+.sr-back-btn {
+    flex: none; display: grid; place-items: center;
+    width: 34px; height: 34px; border-radius: 10px;
+    border: 1px solid var(--line); background: rgba(255, 255, 255, 0.03);
+    color: var(--text); font-size: 24px; line-height: 1; cursor: pointer; transition: 0.2s;
+}
+.sr-back-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 14px rgba(79, 209, 30, 0.3); }
+.sr-brand { display: flex; align-items: center; gap: 10px; flex: none; }
+.sr-brand .sr-logo-mark { flex: none; }
 .sr-logo-mark {
     display: grid;
     place-items: center;
@@ -78,35 +108,30 @@
     font-weight: 800;
     letter-spacing: 0.06em;
     color: #fff;
+    white-space: nowrap;
 }
 .sr-brand h1 span { color: var(--cyan); }
-.sr-live {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 11px; font-weight: 700; letter-spacing: 0.14em;
-    color: var(--cyan);
-    padding: 3px 8px;
-    border: 1px solid rgba(79, 209, 30, 0.4);
-    border-radius: 6px;
-    background: rgba(79, 209, 30, 0.08);
-}
-.sr-live i {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--cyan);
-    box-shadow: 0 0 8px var(--cyan);
-    animation: sr-blink 1.4s infinite;
-}
 @keyframes sr-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
 
-.sr-header-right { display: flex; align-items: center; gap: 10px; }
-.sr-balance { text-align: right; line-height: 1.05; }
-.sr-balance span { display: block; font-size: 10px; letter-spacing: 0.16em; color: var(--muted); }
+.sr-header-right { display: flex; align-items: center; gap: 10px; flex: none; }
+
+/* balance reads as a self-contained "wallet" chip so it never crowds the logo */
+.sr-balance {
+    display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+    height: 40px; padding: 0 13px; line-height: 1.08; white-space: nowrap;
+    border-radius: 12px;
+    border: 1px solid rgba(63, 224, 95, 0.22);
+    background: rgba(63, 224, 95, 0.06);
+}
+.sr-balance span { font-size: 9px; letter-spacing: 0.18em; color: var(--muted); }
 .sr-balance strong {
     font-family: 'Orbitron', sans-serif;
-    font-size: clamp(13px, 3.5vw, 17px);
+    font-size: clamp(14px, 3.4vw, 17px);
     color: var(--gold);
     text-shadow: 0 0 14px rgba(63, 224, 95, 0.4);
 }
-.sr-icon-btn, .sr-avatar {
+
+.sr-icon-btn {
     display: grid; place-items: center;
     width: 40px; height: 40px;
     border-radius: 12px;
@@ -117,32 +142,50 @@
     transition: 0.2s;
 }
 .sr-icon-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 16px rgba(79, 209, 30, 0.3); }
-.sr-avatar {
-    font-family: 'Orbitron', sans-serif;
-    font-weight: 700; font-size: 14px;
-    color: #04121a;
-    background: linear-gradient(135deg, var(--cyan), #1e8a2a);
-    box-shadow: 0 0 16px rgba(79, 209, 30, 0.4);
-}
 
-/* ---------- ARENA ROW ---------- */
-.sr-arena-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
+/* ---- responsive header: shed the least-important bits as width shrinks ---- */
+@media (max-width: 767px) {
+    .sr-header { gap: 8px; padding: 9px 11px; min-height: 56px; }
+    .sr-brand { gap: 8px; }
+    .sr-header-right { gap: 9px; }
 }
-.sr-difficulty, .sr-recent {
+/* below the width where the full row fits comfortably, switch to a compact bar:
+   smaller wordmark and a plain balance amount */
+@media (max-width: 660px) {
+    .sr-brand h1 { font-size: 17px; }
+    .sr-balance { border: none; background: none; padding: 0; height: auto; }
+    .sr-balance span { display: none; }
+    .sr-balance strong { font-size: 15px; }
+}
+@media (max-width: 440px) {
+    .sr-brand h1 { display: none; }            /* logo mark only on the smallest phones */
+}
+/* ---------- STAGE (rail · arena · side) ---------- */
+/* mobile: stage is transparent so its children flow in the root column and can be
+   reordered — bet dock sits right under the arena, info below it */
+.sr-stage { display: contents; }
+.sr-header { order: 0; }
+.sr-rail { order: 1; }
+.sr-arena { order: 2; }
+.sr-dock { order: 3; }
+.sr-side { order: 4; }
+.sr-footer { order: 5; }
+/* flex items default to min-width:auto and refuse to shrink below their content —
+   force them to respect the viewport so nothing overflows sideways on mobile */
+.sr-header, .sr-rail, .sr-arena, .sr-side, .sr-dock, .sr-footer { min-width: 0; max-width: 100%; }
+.sr-difficulty {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 .sr-diff-list {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
 }
 .sr-diff {
     --c: var(--cyan);
+    position: relative;
     display: flex; flex-direction: column; gap: 2px;
     padding: 10px 8px;
     border-radius: 12px;
@@ -152,10 +195,13 @@
     cursor: pointer;
     text-align: left;
     transition: 0.2s;
+    overflow: hidden;
 }
 .sr-diff b { font-family: 'Orbitron', sans-serif; font-size: 12px; letter-spacing: 0.04em; }
 .sr-diff small { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; }
 .sr-diff em { font-style: normal; font-weight: 700; font-size: 14px; color: var(--c); }
+/* multiplier badge — hidden on the compact mobile grid, shown on the desktop rail */
+.sr-diff-mult { display: none; }
 .sr-diff:hover:not(:disabled) { border-color: var(--c); transform: translateY(-1px); }
 .sr-diff.active {
     border-color: var(--c);
@@ -170,27 +216,15 @@
     border-radius: 18px;
     overflow: hidden;
     aspect-ratio: 4 / 3;
+    /* the arena is filled entirely by absolutely-positioned children, so aspect-ratio
+       can collapse it to ~0 inside the overlay's fixed flex column — guarantee a height */
+    min-height: 44vh;
     max-height: 60vh;
     background: linear-gradient(180deg, #0a1712, #05090a);
     box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.6), 0 20px 50px rgba(0, 0, 0, 0.5);
 }
 .sr-arena .lg3d { position: absolute; inset: 0; z-index: 1; }
-.arena-canvas-wrap { width: 100%; aspect-ratio: 16 / 11; max-height: 460px; }
-.arena-canvas-wrap canvas { display: block; touch-action: manipulation; }
 
-.sr-arena-head {
-    position: absolute; top: 12px; left: 0; right: 0;
-    text-align: center;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 13px; font-weight: 700; letter-spacing: 0.22em;
-    color: var(--cyan);
-    text-shadow: 0 0 14px rgba(79, 209, 30, 0.5);
-    pointer-events: none;
-}
-/* on small arenas the recent-results strip owns the top row (phase still shows in the foot pill) */
-@media (max-width: 700px) {
-    .sr-arena-head { display: none; }
-}
 .sr-arena-foot {
     position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
     padding: 7px 22px;
@@ -205,6 +239,84 @@
 }
 .sr-arena-foot.win { color: var(--win); border-color: rgba(63, 224, 95, 0.6); box-shadow: 0 0 26px rgba(63, 224, 95, 0.4); }
 .sr-arena-foot.loss { color: var(--loss); border-color: rgba(244, 63, 111, 0.6); }
+
+/* ---------- WIN / LOSS CELEBRATION OVERLAY ---------- */
+.sr-outcome {
+    position: absolute; inset: 0; z-index: 8;
+    display: grid; place-items: center;
+    pointer-events: none;
+}
+.sr-outcome.win { animation: sr-win-flash 0.7s ease-out; }
+.sr-outcome.loss { animation: sr-loss-flash 0.6s ease-out; }
+@keyframes sr-win-flash {
+    0% { background: radial-gradient(circle at 50% 45%, rgba(63, 224, 95, 0.42), transparent 62%); }
+    100% { background: transparent; }
+}
+@keyframes sr-loss-flash {
+    0% { background: radial-gradient(circle at 50% 45%, rgba(244, 63, 111, 0.28), transparent 62%); }
+    100% { background: transparent; }
+}
+
+.sr-win-card {
+    display: grid; justify-items: center; gap: 8px;
+    text-align: center;
+    animation: sr-pop-in 0.5s cubic-bezier(0.18, 1.5, 0.4, 1) both;
+}
+.sr-win-trophy {
+    color: var(--gold);
+    filter: drop-shadow(0 0 16px rgba(63, 224, 95, 0.7));
+    animation: sr-trophy-bob 0.9s ease-in-out infinite alternate;
+}
+@keyframes sr-trophy-bob { from { transform: translateY(0) rotate(-7deg); } to { transform: translateY(-8px) rotate(7deg); } }
+.sr-win-title {
+    font-family: 'Orbitron', sans-serif; font-weight: 900;
+    font-size: clamp(30px, 7vw, 66px); letter-spacing: 0.03em; line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 26px var(--win), 0 0 54px rgba(63, 224, 95, 0.8);
+    animation: sr-win-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes sr-win-pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+.sr-win-amt {
+    font-family: 'Orbitron', sans-serif; font-weight: 800;
+    font-size: clamp(19px, 4vw, 34px);
+    color: var(--gold); text-shadow: 0 0 20px rgba(63, 224, 95, 0.7);
+    padding: 8px 22px; border-radius: 999px;
+    border: 1px solid rgba(63, 224, 95, 0.55);
+    background: rgba(4, 20, 10, 0.6); backdrop-filter: blur(6px);
+}
+
+.sr-loss-card {
+    display: grid; justify-items: center; gap: 4px; text-align: center;
+    animation: sr-pop-in 0.4s ease both;
+}
+.sr-loss-title {
+    font-family: 'Orbitron', sans-serif; font-weight: 800;
+    font-size: clamp(26px, 5.5vw, 46px); letter-spacing: 0.08em;
+    color: var(--loss); text-shadow: 0 0 22px rgba(244, 63, 111, 0.6);
+}
+.sr-loss-sub { color: var(--muted); font-weight: 700; letter-spacing: 0.1em; font-size: clamp(11px, 2.6vw, 14px); }
+@keyframes sr-pop-in { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* confetti rain, contained inside the overflow-hidden container */
+.sr-confetti { position: absolute; inset: 0; overflow: hidden; }
+.sr-confetti span {
+    position: absolute; top: -24px;
+    width: 9px; height: 15px; border-radius: 2px;
+    opacity: 0; will-change: transform, opacity;
+    animation-name: sr-confetti-fall; animation-timing-function: cubic-bezier(0.3, 0.5, 0.7, 1);
+    animation-iteration-count: 1; animation-fill-mode: forwards;
+}
+/* each piece drifts sideways (--dx) and spins (--rot), then fades out as it lands
+   so nothing freezes on screen */
+@keyframes sr-confetti-fall {
+    0%   { transform: translate(0, -24px) rotate(0deg); opacity: 0; }
+    10%  { opacity: 1; }
+    75%  { opacity: 1; }
+    100% { transform: translate(var(--dx, 0px), 105vh) rotate(var(--rot, 600deg)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sr-confetti, .sr-win-title, .sr-win-trophy { animation: none; }
+}
 
 .sr-countdown {
     position: absolute; top: 44px; left: 50%; transform: translateX(-50%);
@@ -253,19 +365,6 @@
 .sr-rchip.loss { color: #2a0713; background: var(--loss); box-shadow: 0 0 10px rgba(244, 63, 111, 0.6); }
 @keyframes sr-rchip-in { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
-.sr-recent-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(30px, 1fr));
-    gap: 7px;
-}
-.sr-chip {
-    display: grid; place-items: center;
-    width: 30px; height: 30px; border-radius: 50%;
-    font-weight: 700; font-size: 13px;
-}
-.sr-chip.win { color: #04201c; background: var(--win); box-shadow: 0 0 12px rgba(63, 224, 95, 0.5); }
-.sr-chip.loss { color: #2a0713; background: var(--loss); box-shadow: 0 0 12px rgba(244, 63, 111, 0.5); }
-
 /* ---------- PANELS ---------- */
 .sr-panel {
     border: 1px solid var(--line);
@@ -275,11 +374,27 @@
     backdrop-filter: blur(8px);
 }
 
-/* ---------- BET ---------- */
-.sr-bet { display: flex; flex-direction: column; gap: 14px; }
-.sr-bet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-/* bet amounts (left) + bet input stepper (right) always share one row */
-.sr-bet-controls { display: flex; gap: 10px; align-items: center; }
+/* ---------- BET DOCK ---------- */
+.sr-dock {
+    display: flex; flex-direction: column; gap: 14px;
+    background: linear-gradient(180deg, rgba(20, 24, 46, 0.7), rgba(9, 11, 22, 0.82));
+    box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.sr-dock-chips { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.sr-dock-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sr-dock-actions .sr-start { flex: 1; min-width: 180px; }
+.sr-dock-actions .sr-howto { flex: none; order: 3; }
+
+/* live "you win" readout that fills the deck's centre on wide screens */
+.sr-dock-payout { display: none; flex-direction: column; gap: 4px; padding: 0 8px; }
+.sr-dock-payout-val { display: flex; align-items: center; gap: 8px; }
+.sr-dock-payout .sr-coin { display: grid; place-items: center; color: var(--gold); filter: drop-shadow(0 0 8px rgba(63, 224, 95, 0.55)); }
+.sr-dock-payout strong {
+    font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 26px; line-height: 1;
+    color: var(--gold); text-shadow: 0 0 18px rgba(63, 224, 95, 0.45);
+}
+.sr-dock-payout em { font-style: normal; font-weight: 700; font-size: 14px; color: var(--gold); opacity: 0.8; }
+
 .sr-label-cyan, .sr-label-gold {
     display: inline-flex; align-items: center; gap: 8px;
 }
@@ -319,7 +434,6 @@
     font-size: clamp(12px, 3.2vw, 16px);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
-.sr-preset-other .sr-chip-face { font-size: 9px; letter-spacing: 0; }
 .sr-preset:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.08); }
 .sr-preset.active {
     transform: translateY(-3px);
@@ -364,24 +478,7 @@
 }
 .sr-bet-unit { font-family: 'Rajdhani'; font-size: clamp(11px, 3vw, 14px); font-weight: 700; letter-spacing: 0.06em; color: var(--muted); }
 
-/* potential-win + start together in one bordered container */
-.sr-startbox {
-    display: flex; flex-direction: column; gap: 14px;
-    border: 1px solid rgba(18, 179, 106, 0.28);
-    border-radius: 16px;
-    background: linear-gradient(180deg, rgba(24, 20, 46, 0.4), rgba(9, 11, 22, 0.55));
-    box-shadow: inset 0 0 40px -20px var(--purple);
-    padding: 16px;
-}
-.sr-potential { display: flex; flex-direction: column; gap: 10px; justify-content: center; }
-.sr-potential-inner { display: flex; align-items: center; gap: 12px; }
 .sr-coin { display: grid; place-items: center; color: var(--gold); filter: drop-shadow(0 0 8px rgba(63, 224, 95, 0.6)); }
-.sr-potential-inner strong {
-    font-family: 'Orbitron', sans-serif; font-size: clamp(28px, 8vw, 40px); font-weight: 800; line-height: 1;
-    color: var(--gold); text-shadow: 0 0 20px rgba(63, 224, 95, 0.5);
-}
-.sr-potential-inner em { font-style: normal; font-size: 16px; font-weight: 700; color: var(--gold); opacity: 0.85; }
-.sr-startbox-div { display: none; }
 
 .sr-start {
     display: inline-flex; align-items: center; justify-content: center; gap: 12px;
@@ -409,6 +506,15 @@
 }
 .sr-howto:hover { text-shadow: 0 0 12px rgba(79, 209, 30, 0.6); }
 
+/* ---------- SIDE PANEL ---------- */
+.sr-side { display: flex; flex-direction: column; gap: 12px; }
+
+/* slim scrollbars for the internally-scrolling columns */
+.sr-side, .sr-rail { scrollbar-width: thin; scrollbar-color: rgba(79, 209, 30, 0.35) transparent; }
+.sr-side::-webkit-scrollbar, .sr-rail::-webkit-scrollbar { width: 6px; }
+.sr-side::-webkit-scrollbar-thumb, .sr-rail::-webkit-scrollbar-thumb { background: rgba(79, 209, 30, 0.3); border-radius: 6px; }
+.sr-side::-webkit-scrollbar-track, .sr-rail::-webkit-scrollbar-track { background: transparent; }
+
 /* ---------- STATS ---------- */
 .sr-stats {
     display: grid;
@@ -434,11 +540,6 @@
 .sr-stat.tone-gold strong { color: var(--gold); }
 
 /* ---------- BOTTOM ---------- */
-.sr-bottom {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-}
 .sr-guide ol { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 11px; }
 .sr-guide li { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 14px; }
 .sr-guide-ico { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; color: var(--cyan); background: rgba(79, 209, 30, 0.1); border: 1px solid rgba(79, 209, 30, 0.2); flex: none; }
@@ -553,39 +654,85 @@
 .sr-sheet-mults em { font-style: normal; font-weight: 700; font-size: 18px; color: var(--c); }
 
 /* ---------- RESPONSIVE ---------- */
-@media (min-width: 560px) {
-    /* potential + start side by side with a divider */
-    .sr-startbox { flex-direction: row; align-items: stretch; }
-    .sr-potential { flex: 1; }
-    .sr-startbox-div {
-        display: block; width: 1px; align-self: stretch;
-        background: linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0));
-    }
-    .sr-start { flex: 1.15; }
-}
 @media (min-width: 700px) {
-    /* enough room for all six chips — drop the scroll + fade so nothing is dimmed */
+    /* enough room for all chips — drop the scroll + fade so nothing is dimmed */
     .sr-presets { overflow-x: visible; -webkit-mask-image: none; mask-image: none; }
+    .sr-arena { aspect-ratio: 16 / 9.5; max-height: 62vh; }
 }
 @media (min-width: 760px) {
     .sr-stats { grid-template-columns: repeat(5, 1fr); }
     .sr-footer { grid-template-columns: repeat(4, 1fr); }
-}
-@media (min-width: 1024px) {
+    /* bet dock becomes a single control-deck row */
+    .sr-dock { flex-direction: row; align-items: center; gap: 22px; }
+    .sr-dock-chips { flex: none; }
+    .sr-dock-payout {
+        display: flex; flex: 1; min-width: 0;
+        padding-left: 22px; border-left: 1px solid var(--line);
+    }
+    .sr-dock-actions { flex: none; }
+    .sr-dock-actions .sr-start { flex: none; min-width: 200px; }
     .sr-presets { gap: 12px; }
-    .sr-start { flex: 1.4; }
-}
-@media (min-width: 700px) {
-    .sr-arena { aspect-ratio: 16 / 9.5; max-height: 62vh; }
-}
-@media (min-width: 960px) {
-    .sr-arena-row { grid-template-columns: 200px 1fr; align-items: stretch; }
-    .sr-difficulty .sr-diff-list { grid-template-columns: 1fr; }
-    .sr-arena { aspect-ratio: auto; height: 100%; min-height: 420px; }
-    .sr-bottom { grid-template-columns: 1fr 1fr 1.2fr; align-items: start; }
 }
 
+/* ---------- DESKTOP APP-SHELL (no page scroll) ---------- */
+@media (min-width: 1024px) {
+    .sr-root {
+        max-width: none;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        padding: 14px 20px 16px;
+        gap: 14px;
+        overflow: hidden;
+    }
+
+    /* stage fills the space between header and dock */
+    .sr-stage {
+        flex: 1; min-height: 0;
+        display: grid;
+        grid-template-columns: 224px minmax(0, 1fr) clamp(320px, 24vw, 380px);
+        gap: 16px;
+    }
+
+    /* level rail — vertical cards with a multiplier badge */
+    .sr-rail { min-height: 0; overflow-y: auto; padding-right: 2px; }
+    .sr-rail .sr-diff-list { grid-template-columns: 1fr; gap: 10px; }
+    .sr-rail .sr-diff { gap: 4px; padding: 14px 14px 13px; }
+    .sr-rail .sr-diff b { font-size: 15px; }
+    .sr-rail .sr-diff small { font-size: 11px; }
+    .sr-rail .sr-diff em { font-size: 15px; margin-top: 2px; }
+    .sr-rail .sr-diff-mult {
+        display: block; position: absolute; top: 10px; right: 12px;
+        font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 13px;
+        color: var(--c); opacity: 0.9; text-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
+    }
+
+    /* arena is the hero — fills the centre column */
+    .sr-arena { aspect-ratio: auto; height: 100%; max-height: none; min-height: 0; }
+
+    /* info column scrolls internally if it overflows */
+    .sr-side { min-height: 0; overflow-y: auto; padding-right: 2px; }
+    .sr-side .sr-stats { grid-template-columns: repeat(2, 1fr); }
+    .sr-side .sr-livetable { flex: 1; }
+
+    /* dock control deck */
+    .sr-dock { padding: 12px 18px; }
+    .sr-dock-actions .sr-start { min-width: 240px; }
+
+    /* trust footer is marketing fluff — hide it in the immersive shell */
+    .sr-footer { display: none; }
+}
+
+@media (min-width: 1420px) {
+    .sr-stage { grid-template-columns: 240px minmax(0, 1fr) 400px; gap: 20px; }
+}
+
+/* keep the shell filling the display when natively fullscreen */
+.sr-root:fullscreen { max-width: none; height: 100vh; height: 100dvh; overflow: hidden; }
+
 /* ---------- LIVE GAME PANEL (clickable) ---------- */
+/* on phones/tablets the header LIVE button is the shortcut, so drop the big promo card */
+@media (max-width: 1023px) { .sr-livegame { display: none; } }
 .sr-livegame { border: 1px solid var(--line); cursor: pointer; text-align: left; font: inherit; color: var(--text); transition: 0.2s; }
 .sr-livegame:hover { border-color: var(--cyan); box-shadow: 0 0 22px -8px var(--cyan); transform: translateY(-1px); }
 .sr-livegame-scene { position: relative; }
@@ -612,6 +759,7 @@
         radial-gradient(130% 90% at 50% 125%, rgba(8, 55, 22, 0.7), transparent 60%),
         #03110a;
 }
+/* faint drifting light motes to keep the backdrop feeling alive */
 .lg-bg::after {
     content: ''; position: absolute; inset: 0;
     background-image:
@@ -622,6 +770,7 @@
     animation: lg-bokeh 20s linear infinite;
 }
 @keyframes lg-bokeh { from { background-position: 0 0, 40px 30px; } to { background-position: 90px 200px, -110px 260px; } }
+@media (prefers-reduced-motion: reduce) { .lg-bg::after { animation: none; } }
 
 .lg3d { position: absolute; inset: 0; z-index: 1; }
 .lg3d canvas { touch-action: manipulation; }
@@ -630,18 +779,32 @@
 .lg-overlay > * { pointer-events: auto; }
 .lg-spacer { flex: 1; position: relative; pointer-events: none; }
 
-.lg-glass { border: 1px solid rgba(120, 200, 140, 0.2); background: rgba(6, 20, 12, 0.55); backdrop-filter: blur(8px); }
-
 .lg-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.lg-back {
-    display: inline-flex; align-items: center; gap: 4px;
+/* SOLO mini-game entry (replaces the old Back button — LIVE is the landing page) */
+.lg-solo-btn {
+    display: inline-flex; align-items: center; gap: 6px; flex: none;
     padding: 9px 15px; border-radius: 12px;
-    border: 1px solid rgba(120, 200, 140, 0.25); background: rgba(6, 20, 12, 0.6); backdrop-filter: blur(8px); color: var(--text);
-    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 15px; cursor: pointer; transition: 0.2s;
+    border: 1px solid rgba(79, 209, 30, 0.5); background: rgba(79, 209, 30, 0.12); backdrop-filter: blur(8px);
+    color: var(--cyan);
+    font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 13px; letter-spacing: 0.08em;
+    cursor: pointer; transition: 0.2s;
 }
-.lg-back:hover { border-color: var(--cyan); color: var(--cyan); }
+.lg-solo-btn:hover { border-color: var(--cyan); color: #fff; box-shadow: 0 0 18px -5px var(--cyan); }
+.lg-icon-btn {
+    display: grid; place-items: center; flex: none;
+    width: 38px; height: 38px; border-radius: 12px;
+    border: 1px solid rgba(120, 200, 140, 0.25); background: rgba(6, 20, 12, 0.6); backdrop-filter: blur(8px);
+    color: var(--text); cursor: pointer; transition: 0.2s;
+}
+.lg-icon-btn:hover { border-color: var(--cyan); color: var(--cyan); }
 .lg-title { font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: clamp(12px, 3.2vw, 16px); letter-spacing: 0.06em; color: var(--cyan); text-shadow: 0 0 12px rgba(79, 209, 30, 0.5); }
-.lg-headright { display: flex; align-items: center; gap: 10px; }
+.lg-headright { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 560px) {
+    /* keep the live header on one row on phones */
+    .lg-title { display: none; }
+    .lg-solo-btn { padding: 8px 12px; font-size: 12px; }
+    .lg-headright { gap: 6px; }
+}
 .lg-players-btn {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 8px 12px; border-radius: 12px;
@@ -657,16 +820,21 @@
 .lg-status {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: 10px 16px; border-radius: 12px;
-    border: 1px solid rgba(120, 200, 140, 0.2); background: rgba(6, 20, 12, 0.55); backdrop-filter: blur(8px);
+    
 }
 .lg-phase { font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: clamp(13px, 3.8vw, 18px); letter-spacing: 0.05em; color: #fff; }
 .lg-status.betting .lg-phase, .lg-status.picking .lg-phase { color: var(--cyan); text-shadow: 0 0 14px rgba(79, 209, 30, 0.5); }
 .lg-status.reveal .lg-phase { color: var(--gold); }
 .lg-timer {
-    flex: none; display: grid; place-items: center; min-width: 46px; height: 40px; padding: 0 10px;
-    border-radius: 10px; border: 1px solid rgba(79, 209, 30, 0.5); background: rgba(0, 0, 0, 0.4);
-    font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: 18px; color: var(--cyan);
+    flex: none; display: grid; place-items: center;
+    min-width: clamp(64px, 16vw, 88px); height: clamp(52px, 13vw, 68px); padding: 0 16px;
+    border-radius: 14px; border: 1.5px solid rgba(79, 209, 30, 0.65); background: rgba(0, 0, 0, 0.45);
+    box-shadow: 0 0 24px -6px var(--cyan), inset 0 0 18px -10px var(--cyan);
+    font-family: 'Orbitron', sans-serif; font-weight: 800; font-size: clamp(28px, 7vw, 40px);
+    color: var(--cyan); text-shadow: 0 0 16px rgba(79, 209, 30, 0.6); line-height: 1;
+    animation: lg-timer-tick 1s ease-in-out infinite;
 }
+@keyframes lg-timer-tick { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 
 .lg-online {
     position: absolute; left: 4px; bottom: 6px;
@@ -686,7 +854,6 @@
 .lg-joined-info span { display: block; font-size: 10px; letter-spacing: 0.12em; color: var(--muted); }
 .lg-joined-info strong { font-family: 'Orbitron', sans-serif; font-size: 20px; color: #fff; }
 .lg-joined-info strong.win { color: var(--gold); }
-.lg-joined-msg { grid-column: 1 / -1; text-align: center; font-weight: 700; letter-spacing: 0.06em; color: var(--cyan); }
 
 /* slide-in live players panel */
 .lg-scrim { position: absolute; inset: 0; z-index: 3; background: rgba(2, 8, 4, 0.55); opacity: 0; pointer-events: none; transition: 0.3s; }

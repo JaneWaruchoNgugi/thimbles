@@ -6,7 +6,7 @@ import { sfx } from './sound';
 
 const SHUFFLE_MS = 3800;
 const REVEAL_MS = 950;
-const RESULT_MS = 2800;
+const RESULT_MS = 3600;
 const COUNTDOWN_FROM = 3;
 
 interface Options {
@@ -119,11 +119,15 @@ export function useShellRush({ soundEnabled, balance, setBalance }: Options) {
     }, [phase, play]);
 
     // Shuffle runs on the canvas; here we just time the transition to picking.
+    // The whoosh is fired per real swap via `playSwap` (below) so it stays in sync.
     useEffect(() => {
         if (phase !== 'shuffling') return;
         const id = later(() => setPhase('picking'), SHUFFLE_MS);
         return () => clearTimeout(id);
     }, [phase, later]);
+
+    // Called by the arena on each visible cup swap.
+    const playSwap = useCallback(() => play(sfx.swap), [play]);
 
     const finishRound = useCallback(
         (won: boolean) => {
@@ -188,6 +192,7 @@ export function useShellRush({ soundEnabled, balance, setBalance }: Options) {
         setBet,
         startGame,
         pickSlot,
+        playSwap,
     };
 }
 

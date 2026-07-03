@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { GamePhase } from './types';
 import { mulberry32 } from './rng';
@@ -10,6 +10,8 @@ interface Props {
     pickedSlot: number | null;
     seed?: number;
     onPick: (slot: number, isGem: boolean) => void;
+    onSwap?: () => void;
+    bare?: boolean; // skip the 3D floor/table so a backdrop photo shows through (live game)
 }
 
 interface Cup3D {
@@ -27,7 +29,7 @@ const LIFT_Y = 1.9;
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-export function LiveArena3D(props: Props) {
+export const LiveArena3D = memo(function LiveArena3D(props: Props) {
     const mountRef = useRef<HTMLDivElement>(null);
     const propsRef = useRef(props);
     propsRef.current = props;
@@ -36,16 +38,19 @@ export function LiveArena3D(props: Props) {
         const mount = mountRef.current;
         if (!mount) return;
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-        renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+        // cap the render resolution — 2x on a phone is a lot of pixels for little gain
+        renderer.setPixelRatio(Math.min(1.75, window.devicePixelRatio || 1));
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         mount.appendChild(renderer.domElement);
         renderer.domElement.style.width = '100%';
         renderer.domElement.style.height = '100%';
         renderer.domElement.style.display = 'block';
 
+        const bare = !!propsRef.current.bare;
+
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x03120a, 0.028);
+        if (!bare) scene.fog = new THREE.FogExp2(0x03120a, 0.028);
 
         const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
         camera.position.set(0, 5.4, 8.2);
@@ -68,55 +73,35 @@ export function LiveArena3D(props: Props) {
         gemLight.position.set(0, 0.6, 0);
         scene.add(gemLight);
 
-        // ---- floor (reflective-ish dark casino floor) ----
-        const floor = new THREE.Mesh(
-            new THREE.CircleGeometry(40, 64),
-            new THREE.MeshStandardMaterial({ color: 0x061a0e, roughness: 0.55, metalness: 0.35 }),
-        );
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -0.62;
-        scene.add(floor);
+        // The big dark floor + hall orbs are skipped in "bare" mode so the backdrop
+        // photo shows through — but the felt table itself always renders.
+        if (!bare) {
+            // ---- floor (reflective-ish dark casino floor) ----
+            const floor = new THREE.Mesh(
+                new THREE.CircleGeometry(40, 64),
+                new THREE.MeshStandardMaterial({ color: 0x061a0e, roughness: 0.55, metalness: 0.35 }),
+            );
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -0.62;
+            scene.add(floor);
 
-        // distant bokeh light orbs for a "casino hall" backdrop
-        const orbGeo = new THREE.SphereGeometry(0.5, 12, 12);
-        const orbColors = [0x39e06a, 0x18d0a0, 0x2f9e2a, 0x8ef23c, 0x39e08a];
-        for (let i = 0; i < 26; i++) {
-            const m = new THREE.Mesh(orbGeo, new THREE.MeshBasicMaterial({
-                color: orbColors[i % orbColors.length], transparent: true, opacity: 0.35,
-            }));
-            const ang = (i / 26) * Math.PI * 2;
-            const rad = 14 + (i % 4) * 3;
-            m.position.set(Math.cos(ang) * rad, 1 + (i % 5) * 1.6, Math.sin(ang) * rad - 6);
-            const s = 0.4 + (i % 3) * 0.4;
-            m.scale.setScalar(s);
-            scene.add(m);
+            // distant bokeh light orbs for a "casino hall" backdrop
+            const orbGeo = new THREE.SphereGeometry(0.5, 12, 12);
+            const orbColors = [0x39e06a, 0x18d0a0, 0x2f9e2a, 0x8ef23c, 0x39e08a];
+            for (let i = 0; i < 26; i++) {
+                const m = new THREE.Mesh(orbGeo, new THREE.MeshBasicMaterial({
+                    color: orbColors[i % orbColors.length], transparent: true, opacity: 0.35,
+                }));
+                const ang = (i / 26) * Math.PI * 2;
+                const rad = 14 + (i % 4) * 3;
+                m.position.set(Math.cos(ang) * rad, 1 + (i % 5) * 1.6, Math.sin(ang) * rad - 6);
+                const s = 0.4 + (i % 3) * 0.4;
+                m.scale.setScalar(s);
+                scene.add(m);
+            }
         }
 
-        // ---- moving light rays (casino searchlights sweeping the backdrop) ----
-        const rayGroup = new THREE.Group();
-        rayGroup.position.set(0, 11, -2.5); // high up behind the table = ceiling spotlights
-        rayGroup.rotation.x = 0.16;
-        scene.add(rayGroup);
-        const rayColors = [0x62ff6e, 0x18e0a8, 0xa2f23c, 0x39e08a, 0x2fd18a];
-        const rays: THREE.Object3D[] = [];
-        const NRAY = 7;
-        for (let i = 0; i < NRAY; i++) {
-            const mat = new THREE.MeshBasicMaterial({
-                color: rayColors[i % rayColors.length],
-                transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending,
-                depthWrite: false, side: THREE.DoubleSide, fog: false,
-            });
-            // narrow tip at the top (the light), widening downward toward the table
-            const beam = new THREE.Mesh(new THREE.ConeGeometry(1.5, 30, 24, 1, true), mat);
-            beam.position.y = -15;
-            const pivot = new THREE.Object3D();
-            pivot.add(beam);
-            pivot.rotation.z = (i / (NRAY - 1) - 0.5) * 0.95;
-            rayGroup.add(pivot);
-            rays.push(pivot);
-        }
-
-        // ---- table ----
+        // ---- table (always shown; in the live game it sits on the arena photo) ----
         const table = new THREE.Group();
         const feltMat = new THREE.MeshStandardMaterial({ color: 0x0f5a2c, roughness: 0.92, metalness: 0.02 });
         const top = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 0.5, 80), feltMat);
@@ -204,6 +189,10 @@ export function LiveArena3D(props: Props) {
         let camHeight = 5.4;
         const slotX = (slot: number, n: number) => (slot - (n - 1) / 2) * spacing;
 
+        // In bare mode aim a little above the table so it sits in the mid/lower frame
+        // over the arena photo (lower value = table rides higher in the frame).
+        const lookAtY = bare ? 1.7 : 0.7;
+
         // Frame the table for the current viewport — pull back on narrow/portrait screens.
         function applyCamera() {
             const w = mount!.clientWidth || 1;
@@ -211,7 +200,7 @@ export function LiveArena3D(props: Props) {
             const aspect = w / h;
             const f = aspect < 1.4 ? Math.min(2.2, 1.4 / Math.max(0.42, aspect)) : 1;
             camera.position.set(0, camHeight * (1 + (f - 1) * 0.35), camDist * f);
-            camera.lookAt(0, 0.7, 0);
+            camera.lookAt(0, lookAtY, 0);
         }
 
         function buildCups(n: number) {
@@ -259,6 +248,7 @@ export function LiveArena3D(props: Props) {
             const n = cups.length;
             const sa = ca.slot; ca.slot = cb.slot; cb.slot = sa;
             for (const c of [ca, cb]) { c.ax = c.x; c.bx = slotX(c.slot, n); c.t = 0; c.dur = 430; }
+            propsRef.current.onSwap?.(); // whoosh in sync with the visible slide
         }
 
         let phaseLocal: GamePhase = 'idle';
@@ -378,29 +368,39 @@ export function LiveArena3D(props: Props) {
                 cone.rotation.y = clock * 2;
             }
 
-            // gently drift the casino glow lights
-            glow1.position.x = Math.sin(clock * 0.5) * 6;
-            glow2.position.x = Math.cos(clock * 0.4) * 6;
-
-            // sweep the light rays
-            rayGroup.rotation.y = Math.sin(clock * 0.22) * 0.55;
-            for (let i = 0; i < rays.length; i++) {
-                rays[i].rotation.z = (i / (NRAY - 1) - 0.5) * 0.95 + Math.sin(clock * 0.6 + i * 0.8) * 0.13;
-            }
-
             renderer.render(scene, camera);
             raf = requestAnimationFrame(frame);
         }
         raf = requestAnimationFrame(frame);
 
+        // stop rendering while the tab is hidden — no point spending GPU/battery
+        function onVisibility() {
+            if (document.hidden) {
+                if (raf) { cancelAnimationFrame(raf); raf = 0; }
+            } else if (!raf) {
+                last = performance.now();
+                raf = requestAnimationFrame(frame);
+            }
+        }
+        document.addEventListener('visibilitychange', onVisibility);
+
         return () => {
-            cancelAnimationFrame(raf);
+            if (raf) cancelAnimationFrame(raf);
+            document.removeEventListener('visibilitychange', onVisibility);
             ro.disconnect();
             renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+            // free GPU memory — matters when toggling between solo and live arenas
+            scene.traverse((obj) => {
+                const mesh = obj as THREE.Mesh;
+                mesh.geometry?.dispose?.();
+                const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+                if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+                else mat?.dispose?.();
+            });
             renderer.dispose();
             if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
         };
     }, []);
 
     return <div className="lg3d" ref={mountRef} />;
-}
+});

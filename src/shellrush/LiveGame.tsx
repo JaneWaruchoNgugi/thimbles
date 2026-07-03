@@ -16,6 +16,7 @@ const PICK_MS = 6000;
 const REVEAL_MS = 3000;
 const BREAK_MS = 2000;
 const CYCLE = BET_MS + SHUF_MS + PICK_MS + REVEAL_MS + BREAK_MS; // 24s
+const LIVE_CONFETTI = ['#3fe05f', '#4fd11e', '#a6f24c', '#f4d03f', '#f43f6f', '#5fd8ff'];
 
 type Sub = 'betting' | 'shuffling' | 'picking' | 'reveal' | 'break';
 
@@ -69,10 +70,14 @@ interface Props {
     balance: number;
     setBalance: Dispatch<SetStateAction<number>>;
     soundEnabled: boolean;
-    onClose: () => void;
+    onToggleSound: () => void;
+    isFullscreen: boolean;
+    toggleFullscreen: () => void;
+    onOpenSolo: () => void;   // open the solo mini game
+    soloOpen: boolean;        // pause our WebGL arena while the solo overlay is up
 }
 
-export function LiveGame({ balance, setBalance, soundEnabled, onClose }: Props) {
+export function LiveGame({ balance, setBalance, soundEnabled, onToggleSound, isFullscreen, toggleFullscreen, onOpenSolo, soloOpen }: Props) {
     const [now, setNow] = useState(() => Date.now());
     const round = computeRound(now);
     const [betAmount, setBetAmount] = useState(10);
@@ -150,25 +155,36 @@ export function LiveGame({ balance, setBalance, soundEnabled, onClose }: Props) 
     return (
         <div className="lg-root lg-immersive">
             <div className="lg-bg" aria-hidden />
-            <LiveArena3D
-                phase={round.gamePhase}
-                shellCount={LIVE_CUPS}
-                gemShellId={round.gemCup}
-                pickedSlot={joined ? (entry?.pickedSlot ?? null) : null}
-                seed={round.index}
-                onPick={onPick}
-            />
+            {/* pause the WebGL arena while the solo overlay covers the screen */}
+            {!soloOpen && (
+                <LiveArena3D
+                    phase={round.gamePhase}
+                    shellCount={LIVE_CUPS}
+                    gemShellId={round.gemCup}
+                    pickedSlot={joined ? (entry?.pickedSlot ?? null) : null}
+                    seed={round.index}
+                    onPick={onPick}
+                    onSwap={() => { if (soundEnabled) sfx.swap(); }}
+                />
+            )}
 
             <div className="lg-overlay">
                 <header className="lg-head">
-                    <button className="lg-back" onClick={onClose}>‹ Back</button>
+                    <button className="lg-solo-btn" onClick={onOpenSolo} aria-label="Play the solo mini game" title="Solo mini game">
+                        <Icon.Play width={14} height={14} /> SOLO
+                    </button>
                     <div className="lg-title"><i className="sr-dot" />LIVE · #{round.index % 100000}</div>
                     <div className="lg-headright">
-                        <button className="lg-players-btn" onClick={() => setPlayersOpen(true)}>
-                            <Icon.Headset width={16} height={16} /> Players
-                            <b>{players.length + (joined ? 1 : 0)}</b>
+                        <button className="lg-players-btn" onClick={() => setPlayersOpen(true)} aria-label="Live players">
+                            <Icon.Headset width={16} height={16} /> <b>{players.length + (joined ? 1 : 0)}</b>
                         </button>
                         <div className="lg-balance"><span>BALANCE</span><strong>KES {fmt(balance)}</strong></div>
+                        <button className="lg-icon-btn" onClick={onToggleSound} aria-label={soundEnabled ? 'Mute sound' : 'Unmute sound'}>
+                            {soundEnabled ? <Icon.SoundOn width={18} height={18} /> : <Icon.SoundOff width={18} height={18} />}
+                        </button>
+                        <button className="lg-icon-btn" onClick={toggleFullscreen} aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}>
+                            {isFullscreen ? <Icon.Compress width={18} height={18} /> : <Icon.Expand width={18} height={18} />}
+                        </button>
                     </div>
                 </header>
 
@@ -192,7 +208,6 @@ export function LiveGame({ balance, setBalance, soundEnabled, onClose }: Props) 
                             <span>CAN WIN</span>
                             <strong className="win">KES {fmt(entry!.bet * LIVE_MULT)}</strong>
                         </div>
-                        <div className="lg-joined-msg">{statusText}</div>
                     </div>
                 ) : (
                     <>
@@ -217,6 +232,43 @@ export function LiveGame({ balance, setBalance, soundEnabled, onClose }: Props) 
                     )}
                 </div>
             </div>
+
+            {/* WIN / LOSS celebration for your bet at reveal — impossible to miss */}
+            {round.sub === 'reveal' && joined && entry?.outcome && (
+                <div className={`sr-outcome ${entry.outcome === 'win' ? 'win' : 'loss'}`} aria-live="polite">
+                    {entry.outcome === 'win' ? (
+                        <>
+                            <div className="sr-confetti" aria-hidden>
+                                {Array.from({ length: 28 }).map((_, i) => (
+                                    <span
+                                        key={i}
+                                        style={{
+                                            left: `${(i * 37) % 100}%`,
+                                            background: LIVE_CONFETTI[i % LIVE_CONFETTI.length],
+                                            animationDuration: `${1.5 + (i % 5) * 0.3}s`,
+                                            animationDelay: `${(i % 7) * 0.06}s`,
+                                            ['--dx' as string]: `${(((i * 53) % 200) - 100)}px`,
+                                            ['--rot' as string]: `${360 + ((i * 97) % 600)}deg`,
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            <div className="sr-win-card">
+                                <span className="sr-win-trophy"><Icon.Trophy width={40} height={40} /></span>
+                                <span className="sr-win-title">YOU WON!</span>
+                                <span className="sr-win-amt">+ KES {fmt(entry.bet * LIVE_MULT)}</span>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="sr-loss-card">
+                            <span className="sr-loss-title">{entry.outcome === 'refund' ? 'REFUNDED' : 'SO CLOSE'}</span>
+                            <span className="sr-loss-sub">
+                                {entry.outcome === 'refund' ? 'You didn’t pick — bet returned' : 'Better luck next round'}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* slide-in live players */}
             <div className={`lg-scrim${playersOpen ? ' open' : ''}`} onClick={() => setPlayersOpen(false)} />
